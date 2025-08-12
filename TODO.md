@@ -3,4 +3,7 @@
 - [x] Remove auto-download button
 - [ ] Use Structured Outputs
 - [ ] Support other versions of Kuzu
-- [ ] Add vectorization
+- [ ] Add vectorization to Observation.text property
+- [ ] Remove chunk_end_pos, chunk_start_pos
+- [ ] Investigate "WARNING:steps.step4_kuzu_integration:Failed to merge entity 'village': Runtime exception: Found duplicated primary key value location_village, which violates the uniqueness constraint of the primary key column"
+- [ ] Merge KuzuDB which have vector tables

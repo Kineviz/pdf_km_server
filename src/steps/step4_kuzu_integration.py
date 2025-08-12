@@ -62,8 +62,6 @@ def create_kuzu_schema(conn):
                 id STRING PRIMARY KEY,
                 text STRING,
                 index INT64,
-                start_pos INT64,
-                end_pos INT64,
                 pdf_path STRING
             )
         """)
@@ -80,8 +78,6 @@ def create_kuzu_schema(conn):
                 text STRING,
                 relationship STRING,
                 chunk_index INT64,
-                chunk_start_pos INT64,
-                chunk_end_pos INT64,
                 pdf_path STRING
             )
         """)
@@ -197,8 +193,6 @@ def load_pdf_and_chunks_to_kuzu(conn, input_file: str, text_content: str, chunks
                     id: $id,
                     text: $text,
                     index: $index,
-                    start_pos: $start_pos,
-                    end_pos: $end_pos,
                     pdf_path: $pdf_path
                 })
                 """,
@@ -206,8 +200,6 @@ def load_pdf_and_chunks_to_kuzu(conn, input_file: str, text_content: str, chunks
                     "id": chunk_id,
                     "text": chunk['text'],
                     "index": chunk['index'],
-                    "start_pos": chunk['start_pos'],
-                    "end_pos": chunk['end_pos'],
                     "pdf_path": input_file
                 }
             )
@@ -248,8 +240,6 @@ def load_observations_to_kuzu_db(conn, observations: List[Dict[str, Any]], input
                     text: $text,
                     relationship: $relationship,
                     chunk_index: $chunk_index,
-                    chunk_start_pos: $chunk_start_pos,
-                    chunk_end_pos: $chunk_end_pos,
                     pdf_path: $pdf_path
                 })
                 """,
@@ -258,8 +248,6 @@ def load_observations_to_kuzu_db(conn, observations: List[Dict[str, Any]], input
                     "text": obs['observation'],
                     "relationship": obs.get('relationship', ''),
                     "chunk_index": obs['chunk_index'],
-                    "chunk_start_pos": obs['chunk_start_pos'],
-                    "chunk_end_pos": obs['chunk_end_pos'],
                     "pdf_path": input_file
                 }
             )

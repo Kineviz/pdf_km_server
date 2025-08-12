@@ -1,336 +1,131 @@
-# 📚 PDF to Knowledge Map Server
+# PDF to Knowledge Map Server
 
-A **distributed web service** that extracts knowledge from PDF documents and creates graph databases using AI models across multiple Ollama servers.
+A server that processes PDF documents to extract knowledge and create a graph database using AI-powered observation extraction and semantic search capabilities.
 
-## 🚀 Features
+## Features
 
-- **📄 PDF Upload & Processing**: Upload PDF files and extract text content
-- **🤖 AI-Powered Knowledge Extraction**: Use Gemma3 model to extract observations and entities
-- **🔄 Distributed Processing**: Parallel processing across multiple Ollama servers
-- **⚡ Load Balancing**: Automatic failover and round-robin distribution
-- **📊 Real-Time Progress**: Live progress tracking with chunk-level updates
-- **🗄️ Graph Database Generation**: Create KuzuDB knowledge graphs
-- **🌐 Web Interface**: User-friendly Gradio web interface
-- **👥 Job Queue Management**: Handle multiple concurrent users
-- **📥 Download Results**: Download processed databases as ZIP files
-- **⏱️ Time Estimation**: Estimated processing times based on file size
-- **🏥 Health Monitoring**: Automatic server health checks and failover
+- **PDF Text Extraction**: Extract text content from PDF documents
+- **AI-Powered Analysis**: Use Gemma3 model to extract observations and entities
+- **Knowledge Graph Creation**: Build Kuzu graph database with entities and relationships
+- **Semantic Search**: AI-powered vector search across observation text using sentence transformers
+- **Database Merging**: Combine multiple knowledge graphs into consolidated databases
+- **Web Interface**: Gradio-based UI for easy interaction
 
-## 🏗️ Architecture
+## Semantic Search
 
-### **Distributed Processing Pipeline**
-1. **Text Extraction**: Extract raw text from PDF using MarkItDown
-2. **Document Chunking**: Split text into manageable chunks
-3. **Parallel AI Extraction**: Use multiple Ollama servers simultaneously
-4. **Knowledge Graph Creation**: Build KuzuDB with nodes and relationships
-5. **Database Export**: Create downloadable ZIP files
+The server now includes advanced semantic search capabilities:
 
-### **Ollama Cluster Management**
-- **Multiple Servers**: Distribute load across multiple PCs
-- **Health Monitoring**: Automatic ping and HTTP health checks
-- **Load Balancing**: Round-robin distribution across active servers
-- **Failover**: Automatic retry on different servers
-- **Performance Tracking**: Response time and error monitoring
+### How It Works
 
-### **Data Model**
-- **PDF**: Document metadata and content (path, filename, text)
-- **Chunk**: Text segments with position information and PDF source
-- **Observation**: Natural language statements with relationships and PDF source
-- **Entity**: Named entities with categories (Person, Organization, etc.)
-- **Relationships**: HAS_CHUNK, REFERENCE_CHUNK, MENTION
+1. **Vectorization**: All observation text is automatically vectorized using the `all-MiniLM-L6-v2` model
+2. **Vector Storage**: 384-dimensional vectors are stored in a dedicated `ObservationTextVector` table
+3. **Indexing**: Vector index (`observation_text_vector_index`) enables fast similarity search
+4. **Semantic Matching**: Uses cosine similarity to find semantically related content
 
-### **Multi-PDF Support**
-- **PDF path tracking**: All chunks and observations track their source PDF
-- **Data merging**: Multiple PDFs can be processed and merged into the same database
-- **Source identification**: Easy to query which observations came from which PDF
-- **Scalable architecture**: Supports processing multiple documents over time
+### Search Features
 
-## 🚀 Quick Start
+- **Natural Language Queries**: Use plain English to search for concepts
+- **Semantic Understanding**: Finds related content even without exact keyword matches
+- **Relevance Ranking**: Results are ranked by semantic similarity
+- **Context Preservation**: Search results include source PDF and relationship information
 
-### **Prerequisites**
+### Usage
+
+1. Upload a KuzuDB ZIP file in the "🔍 Semantic Search" tab
+2. Enter your search query in natural language
+3. Adjust the number of results (1-50)
+4. Click "🔍 Search" to find relevant observations
+
+### Example Queries
+
+- "machine learning algorithms"
+- "climate change effects"
+- "business strategy implementation"
+- "scientific research methods"
+
+## Installation
+
+### Prerequisites
+
 - Python 3.13+
-- Multiple Ollama servers with Gemma3 model
-- Network access between servers
+- UV package manager
+- Ollama with Gemma3 model
 
-### **Installation**
+### Dependencies
+
+The server automatically installs required dependencies including:
+- `sentence-transformers>=2.5.1` for semantic search
+- `kuzu==0.10.0` for graph database
+- `torch>=2.7.1` for AI models
+- `gradio>=5.39.0` for web interface
+
+## Usage
+
+### Starting the Server
+
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd pdf_km_server/src
-
-# No manual installation needed - uv handles everything automatically
+cd src
+uv run --script server.py
 ```
 
-### **Configure Ollama Servers**
+The server will be available at `http://localhost:7860`
 
-**Step 1: Copy Configuration Template**
-```bash
-cp ollama_servers_example.json ollama_servers.json
-```
+### Processing PDFs
 
-**Step 2: Edit Server Configuration**
-Edit `ollama_servers.json` to add your servers:
-
-```json
-{
-  "servers": [
-    {
-      "name": "Ollama Server 1",
-      "url": "http://ollama_server_1:11434",
-      "model": "gemma3",
-      "timeout": 30,
-      "max_retries": 3
-    },
-    {
-      "name": "Ollama Server 2",
-      "url": "http://ollama_server_2:11434",
-      "model": "gemma3",
-      "timeout": 30,
-      "max_retries": 3
-    }
-  ]
-}
-```
-
-**Configuration Fields:**
-- **name**: Human-readable server identifier
-- **url**: Ollama server URL (must be accessible from this machine)
-- **model**: AI model name (recommended: `gemma3`)
-- **timeout**: Request timeout in seconds
-- **max_retries**: Number of retry attempts on failure
-
-**Step 3: Test Server Connectivity**
-```bash
-# Test individual server speed
-./test_speed.py
-
-# Test parallel processing
-./test_parallel.py
-```
-
-### **Start the Server**
-```bash
-./server.py
-```
-
-The server will start at `http://localhost:7860`
-
-## 📖 Usage
-
-### **1. Upload & Process**
 1. Go to the "Upload & Process" tab
 2. Upload a PDF document
 3. Click "Start Processing"
-4. **Watch real-time progress** with chunk-level updates
-5. Download results when complete
+4. Wait for AI analysis to complete
+5. Download the resulting knowledge graph
 
-### **2. Monitor Cluster Status**
-- **Check Ollama Cluster Status**: See all server health and performance
-- **View job status and progress**: Real-time updates
-- **Check queue status**: Monitor multiple users
+### Semantic Search
 
-### **3. Download Results**
-- Download processed KuzuDB as ZIP files
-- Files are automatically created when processing completes
+1. Go to the "🔍 Semantic Search" tab
+2. Upload a KuzuDB ZIP file
+3. Enter your search query
+4. View semantically relevant results
 
-## ⚙️ Configuration
+## Architecture
 
-### **Ollama Server Configuration**
-Each server in `ollama_servers.json` supports:
+### Processing Pipeline
 
-| Field | Description | Default |
-|-------|-------------|---------|
-| `name` | Server identifier | Required |
-| `url` | Ollama server URL | Required |
-| `model` | Model to use | `gemma3` |
-| `timeout` | Request timeout (seconds) | `30` |
-| `max_retries` | Max retries per request | `3` |
+1. **Text Extraction**: Extract text from PDF
+2. **Chunking**: Split text into manageable segments
+3. **AI Analysis**: Extract observations and entities using Gemma3
+4. **Database Creation**: Build Kuzu graph database
+5. **Vectorization**: Generate embeddings for semantic search
 
-### **Health Check System**
-- **Ping Check**: Tests basic network connectivity
-- **HTTP Check**: Tests Ollama API endpoint (`/api/tags`)
-- **Error Tracking**: Counts consecutive failures
-- **Auto-Deactivation**: Marks servers inactive after 5 errors
+### Database Schema
 
-## 📊 Performance Features
+- **PDF**: Document information and text content
+- **Chunk**: Text segments with metadata
+- **Observation**: AI-extracted knowledge statements
+- **Entity**: Named entities and concepts
+- **ObservationTextVector**: Vector embeddings for semantic search
 
-### **Parallel Processing**
-- **True parallelism**: Multiple chunks processed simultaneously
-- **Server utilization**: All active servers used efficiently
-- **Load distribution**: Round-robin across available servers
-- **Performance improvement**: ~1.46x faster than sequential processing
+### Relationships
 
-### **Real-Time Progress Tracking**
-- **Chunk-level progress**: Shows "Processed 2/5 chunks"
-- **Server utilization**: Indicates which servers are active
-- **Time estimates**: Based on file size and server performance
-- **Live updates**: Progress bar updates in real-time
+- `PDF` → `HAS_CHUNK` → `Chunk`
+- `Observation` → `REFERENCE_CHUNK` → `Chunk`
+- `Observation` → `MENTION` → `Entity`
+- `Observation` → `OBSERVATION_TEXT_VECTOR` → `ObservationTextVector`
 
-## 📊 Job Status Types
+## Performance
 
-- **queued**: Job is waiting to be processed
-- **processing**: Job is currently being processed (with progress)
-- **completed**: Job completed successfully
-- **failed**: Job failed with an error
+- **Processing Time**: 30-120 seconds per PDF (depending on size)
+- **Search Speed**: 2-5 seconds for semantic queries
+- **Vector Index**: Optimized for fast similarity search
+- **Memory Usage**: Efficient vector storage with 384-dimensional embeddings
 
-## 🔄 Processing Steps with Progress
+## Contributing
 
-1. **Text Extraction** (0-5%): Extract raw text from PDF
-2. **Document Chunking** (5%): Split into manageable chunks
-3. **AI Observation Extraction** (5-95%): 
-   - **Real-time chunk progress**: "Processed 1/5 chunks" → "Processed 5/5 chunks"
-   - **Parallel processing**: Multiple servers working simultaneously
-   - **Load balancing**: Requests distributed across servers
-4. **Knowledge Graph Creation** (95-100%): Build KuzuDB database
+1. Fork the repository
+2. Create a feature branch
+3. Implement your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## ⏱️ Time Estimates
+## License
 
-Processing time depends on:
-- **PDF size**: Larger files take longer
-- **Content complexity**: More text = more processing
-- **Server performance**: Faster servers = faster processing
-- **Parallel processing**: Multiple servers reduce total time
-
-**Typical times with distributed processing:**
-- Small PDFs (< 1MB): 20-40 seconds
-- Medium PDFs (1-5MB): 40-80 seconds
-- Large PDFs (> 5MB): 80+ seconds
-
-## 📦 Output Format
-
-### **KuzuDB Structure**
-```
-result_kuzudb/
-└── kuzu_db_[job_id]/
-    ├── catalog.kz
-    ├── data.kz
-    ├── metadata.kz
-    └── [index files]
-```
-
-### **Downloadable ZIP**
-- **Filename**: `km_kuzu_[job_id].zip`
-- **Location**: `result_kuzudb/` directory
-- **Contents**: Complete KuzuDB database
-
-## 🔧 API Endpoints
-
-The web interface provides these functions:
-- **Upload & Process**: Handle PDF uploads and start processing
-- **Check Status**: Monitor job progress and queue status
-- **Check Ollama Cluster Status**: Monitor all server health and performance
-- **Download Results**: Download completed databases
-
-## 🛠️ Troubleshooting
-
-### **Common Issues**
-
-**Server Not Starting:**
-```bash
-# Check if port 7860 is available
-lsof -i :7860
-
-# Kill existing process if needed
-pkill -f "server.py"
-```
-
-**Ollama Connection Issues:**
-```bash
-# Test Ollama server
-curl http://localhost:11434/api/tags
-
-# Check server configuration
-cat ollama_servers.json
-
-# Test cluster health
-python config.py
-```
-
-**Processing Failures:**
-- Check server logs for error messages
-- Verify Ollama servers are running
-- Ensure sufficient disk space for databases
-- Check cluster health status in web interface
-
-### **Performance Monitoring**
-- **Cluster Status**: Monitor all server health in web interface
-- **Response Times**: Track server performance
-- **Error Counts**: Identify problematic servers
-- **Load Distribution**: Ensure even distribution across servers
-
-### **Logs**
-- Check terminal output for detailed logs
-- Look for error messages and warnings
-- Monitor server health status
-- Track parallel processing progress
-
-## 🏗️ Architecture Details
-
-### **Components**
-- **Gradio Web Interface**: User interface and job management
-- **Job Queue**: Thread-safe queue for managing multiple users
-- **Processing Pipeline**: Modular text extraction and AI processing
-- **Ollama Cluster**: Distributed AI model serving with health monitoring
-- **KuzuDB**: Graph database for knowledge storage
-- **Parallel Processing**: ThreadPoolExecutor for concurrent chunk processing
-
-### **Data Flow**
-1. **Upload** → PDF file uploaded to server
-2. **Queue** → Job added to processing queue
-3. **Extract** → Text extracted from PDF
-4. **Chunk** → Text split into manageable segments
-5. **Parallel Process** → AI extracts observations across multiple servers
-6. **Store** → Data loaded into KuzuDB
-7. **Export** → Database packaged as ZIP file
-8. **Download** → User downloads results
-
-### **Distributed Processing Flow**
-```
-PDF Upload → Text Extraction → Chunking → Parallel AI Processing
-                                                      ↓
-                                              Server 1: Chunk 1
-                                              Server 2: Chunk 2
-                                              Server 1: Chunk 3
-                                              Server 2: Chunk 4
-                                                      ↓
-                                              Database Creation → ZIP Export
-```
-
-## 🔒 Security
-
-- **Local Network Only**: Designed for trusted local networks
-- **No Authentication**: Assumes secure local environment
-- **File Handling**: Temporary files cleaned up automatically
-- **Input Validation**: PDF files validated before processing
-- **Network Security**: HTTP only for local network simplicity
-
-## 📈 Performance Benefits
-
-### **Parallel Processing**
-- **Multiple servers** handle requests simultaneously
-- **Reduced wait times** for large documents
-- **Better resource utilization** across network
-
-### **Reliability**
-- **Automatic failover** ensures service continuity
-- **Health monitoring** prevents using broken servers
-- **Error recovery** handles temporary network issues
-
-### **Scalability**
-- **Easy to add servers** - just update config
-- **Load distribution** prevents server overload
-- **Horizontal scaling** for increased capacity
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-The MIT License is a permissive open source license that allows:
-- ✅ Commercial use
-- ✅ Modification
-- ✅ Distribution
-- ✅ Private use
-- ✅ Patent use
-
-The only requirement is that the license and copyright notice be included in all copies or substantial portions of the software.
+This project is licensed under the MIT License - see the LICENSE file for details.
 

@@ -13,6 +13,9 @@
 #     "tqdm>=4.66.0",
 #     "gradio>=5.39.0",
 #     "ping3>=4.0.4",
+#     "sentence-transformers>=2.5.1",
+#     "polars",
+#     "pyarrow",
 # ]
 # ///
 
@@ -34,6 +37,7 @@ from steps.step1_text_extraction import extract_text_from_pdf
 from steps.step2_chunking import chunk_text, create_chunks_with_metadata
 from steps.step3_observation_extraction import extract_observations_from_chunks
 from steps.step4_kuzu_integration import load_observations_to_kuzu
+from steps.step5_vectorization import vectorize_observations
 from config import get_ollama_cluster
 
 # Configure logging
@@ -198,6 +202,11 @@ def upload_and_process_pdf(pdf_file, model="gemma3", progress=gr.Progress()):
         
         # Load into Kuzu database
         load_observations_to_kuzu(observations, kuzu_db_path, text_content, chunks_with_metadata, pdf_file.name)
+        
+        # Step 5: Vectorize observations
+        job_queue.update_job(job_id, progress=97, message="Vectorizing observations...")
+        progress(0.97, desc="Vectorizing observations...")
+        vectorize_observations(kuzu_db_path)
         
         # Calculate processing time
         processing_time = (datetime.now() - job_queue.get_job(job_id)['started_at']).total_seconds()
@@ -579,6 +588,60 @@ def merge_kuzu_databases(kuzu_files, progress=gr.Progress()):
         logger.error(f"Error in merge_kuzu_databases: {e}")
         return None, f"❌ Error during merge: {str(e)}"
 
+
+def perform_semantic_search(kuzu_zip_file, query: str, limit: int):
+    """Perform semantic search on a KuzuDB file."""
+    if not kuzu_zip_file:
+        return "❌ Please upload a KuzuDB ZIP file"
+    
+    if not query or not query.strip():
+        return "❌ Please enter a search query"
+    
+    try:
+        # Create temporary directory for extraction
+        temp_dir = tempfile.mkdtemp()
+        extract_dir = os.path.join(temp_dir, "extracted_kuzu")
+        
+        # Extract the ZIP file
+        with zipfile.ZipFile(kuzu_zip_file.name, 'r') as zipf:
+            zipf.extractall(extract_dir)
+        
+        kuzu_db_path = extract_dir
+        
+        # Import the semantic search function
+        from steps.step5_vectorization import semantic_search
+        
+        # Perform the search
+        results = semantic_search(kuzu_db_path, query.strip(), limit)
+        
+        # Clean up temporary files
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        if not results:
+            return f"🔍 No results found for query: '{query}'"
+        
+        # Format results
+        output = f"🔍 Found {len(results)} results for query: '{query}'\n\n"
+        
+        for i, result in enumerate(results, 1):
+            # Extract filename from path
+            node = result['node']
+            filename = os.path.basename(node['pdf_path']) if node['pdf_path'] else "Unknown"
+            distance = result['distance']
+            text = node['text'][:200] + "..." if len(node['text']) > 200 else node['text']
+            
+            output += f"**{i}. Result (Similarity: {1 - distance:.3f})**\n"
+            output += f"📄 Source: {filename}\n"
+            output += f"🔗 Relationship: {node['relationship']}\n"
+            output += f"📝 Text: {text}\n\n"
+        
+        return output
+        
+    except Exception as e:
+        logger.error(f"Error in semantic search: {e}")
+        return f"❌ Error during search: {str(e)}"
+
+
 # Create Gradio interface
 with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 📚 PDF to Knowledge Map Server")
@@ -685,6 +748,59 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
                 - Preserves all relationships
                 """)
     
+    with gr.Tab("🔍 Semantic Search"):
+        with gr.Row():
+            with gr.Column(scale=2):
+                search_kuzu_input = gr.File(
+                    label="Upload KuzuDB File", 
+                    file_types=[".zip"],
+                    file_count="single"
+                )
+                search_query = gr.Textbox(
+                    label="Search Query",
+                    placeholder="Enter your search query here...",
+                    lines=2
+                )
+                search_limit = gr.Slider(
+                    minimum=1,
+                    maximum=50,
+                    value=10,
+                    step=1,
+                    label="Number of Results",
+                    info="Maximum number of results to return"
+                )
+                search_btn = gr.Button("🔍 Search", variant="primary")
+                search_output = gr.Textbox(label="Search Results", lines=10)
+            
+            with gr.Column(scale=1):
+                gr.Markdown("### Semantic Search")
+                gr.Markdown("""
+                1. **Upload a KuzuDB ZIP file**
+                2. **Enter your search query**
+                3. **AI-powered semantic search** finds relevant observations
+                4. **Results ranked by relevance** using vector similarity
+                5. **View matching observations** with context
+                
+                **Time:** 2-5 seconds
+                """)
+                
+                gr.Markdown("### 🔍 How It Works")
+                gr.Markdown("""
+                - Uses **all-MiniLM-L6-v2** embedding model
+                - **384-dimensional vectors** for observation text
+                - **Cosine similarity** for relevance ranking
+                - **Vector index** for fast search performance
+                - Finds **semantically similar** content, not just exact matches
+                """)
+                
+                gr.Markdown("### 💡 Search Tips")
+                gr.Markdown("""
+                - Use **natural language** queries
+                - **Synonyms and related terms** work well
+                - **Longer queries** often give better results
+                - Results include **observation text** and **source PDF**
+                """)
+    
     # Event handlers
     process_btn.click(
         upload_and_process_pdf,
@@ -697,6 +813,13 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
         merge_kuzu_databases,
         inputs=[kuzu_files_input],
         outputs=[merged_file, merge_output]
+    )
+    
+    # Semantic Search event handler
+    search_btn.click(
+        perform_semantic_search,
+        inputs=[search_kuzu_input, search_query, search_limit],
+        outputs=[search_output]
     )
     
     # Also trigger download when job completes
