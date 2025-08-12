@@ -1,0 +1,6 @@
+- [ ] Anonymize all markdown files
+- [ ] Remove unused code
+- [x] Remove auto-download button
+- [ ] Use Structured Outputs
+- [ ] Support other versions of Kuzu
+- [ ] Add vectorization
