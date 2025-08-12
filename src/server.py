@@ -247,7 +247,7 @@ Job completed! Job ID: {job_id}
 • Observations: {job['observations_count']}
 • Entities: {job['entities_count']}
 • Time: {job['processing_time']:.1f}s
-"""
+""".strip()
     else:
         stats_text = f"Job completed! Job ID: {job_id}\nEstimated time: {estimated_time} seconds"
     
@@ -597,7 +597,8 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
                 )
                 process_btn = gr.Button("Start Processing", variant="primary")
                 upload_output = gr.Textbox(label="Upload Result", lines=3)
-                job_id_output = gr.Textbox(label="Job ID", interactive=False)
+                # Hidden state to store job_id for triggering download preparation
+                job_id_state = gr.State()
                 
                 # Progress tracking - handled automatically by gr.Progress()
                 
@@ -688,7 +689,7 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
     process_btn.click(
         upload_and_process_pdf,
         inputs=[pdf_input, model_select],
-        outputs=[upload_output, job_id_output, download_file]
+        outputs=[upload_output, job_id_state, download_file, auto_download_btn]
     )
     
     # Merge KuzuDB event handler
@@ -699,9 +700,9 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
     )
     
     # Also trigger download when job completes
-    job_id_output.change(
+    job_id_state.change(
         auto_download_when_ready,
-        inputs=[job_id_output],
+        inputs=[job_id_state],
         outputs=[auto_download_file, auto_download_output],
         show_progress=False
     )
