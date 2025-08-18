@@ -262,39 +262,7 @@ Job completed! Job ID: {job_id}
     else:
         stats_text = f"Job completed! Job ID: {job_id}\nEstimated time: {estimated_time} seconds"
     
-    return stats_text, job_id, None, gr.update(visible=True)
-
-
-
-def download_database(job_id):
-    """Download the Kuzu database as a ZIP file."""
-    if not job_id:
-        return None, "Please enter a job ID."
-    
-    job = job_queue.get_job(job_id)
-    if not job:
-        return None, f"Job {job_id} not found."
-    
-    if job['status'] != 'completed':
-        return None, f"Job {job_id} is not completed yet. Status: {job['status']}"
-    
-    kuzu_db_path = job['kuzu_db_path']
-    if not os.path.exists(kuzu_db_path):
-        return None, f"Database file not found for job {job_id}."
-    
-    # Create ZIP file
-    zip_filename = f"result_kuzudb/km_kuzu_{job_id}.zip"
-    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(kuzu_db_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, kuzu_db_path)
-                zipf.write(file_path, arcname)
-    
-    # Ensure the ZIP file is readable
-    os.chmod(zip_filename, 0o644)
-    
-    return zip_filename, f"Database ready for download: {zip_filename}"
+    return stats_text, job_id, gr.update(visible=True)
 
 
 
@@ -606,15 +574,7 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
     
 
     
-    with gr.Tab("Download Results"):
-        with gr.Row():
-            with gr.Column():
-                download_job_id = gr.Textbox(label="Enter Job ID")
-                download_btn = gr.Button("Download Database")
-                download_output = gr.Textbox(label="Download Status")
-            
-            with gr.Column():
-                download_file = gr.File(label="Downloaded Database", visible=False)
+
     
     with gr.Tab("Merge KuzuDB"):
         with gr.Row():
@@ -706,7 +666,7 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
     process_btn.click(
         upload_and_process_pdf,
         inputs=[pdf_input, model_select],
-        outputs=[upload_output, job_id_state, download_file, auto_download_btn]
+        outputs=[upload_output, job_id_state, auto_download_btn]
     )
     
     # Merge KuzuDB event handler
@@ -731,11 +691,7 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
         show_progress=False
     )
     
-    download_btn.click(
-        download_database,
-        inputs=[download_job_id],
-        outputs=[download_file, download_output]
-    )
+
     
     # LLM Health refresh
     refresh_llm_btn.click(
