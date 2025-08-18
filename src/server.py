@@ -264,65 +264,7 @@ Job completed! Job ID: {job_id}
     
     return stats_text, job_id, None, gr.update(visible=True)
 
-def check_job_status(job_id):
-    """Check the status of a job."""
-    if not job_id:
-        return "Please enter a job ID."
-    
-    job = job_queue.get_job(job_id)
-    if not job:
-        return f"Job {job_id} not found."
-    
-    status_info = f"""
-**Job Status: {job['status'].upper()}**
-- Progress: {job['progress']}%
-- Message: {job['message']}
-- Created: {job['created_at'].strftime('%Y-%m-%d %H:%M:%S')}
-"""
-    
-    if job['started_at']:
-        status_info += f"- Started: {job['started_at'].strftime('%Y-%m-%d %H:%M:%S')}\n"
-    
-    if job['estimated_time']:
-        status_info += f"- Estimated time: {job['estimated_time']} seconds\n"
-    
-    # PDF Statistics
-    if job['word_count'] > 0:
-        status_info += f"""
-**PDF Statistics:**
-- Words: {job['word_count']:,}
-- Characters: {job['char_count']:,}
-- Sentences: {job['sentence_count']:,}
-- Avg Words/Sentence: {job['avg_words_per_sentence']:.1f}
-- Estimated Pages: {job['estimated_pages']}
-- Chunks: {job['chunks_count']}
-"""
-    
-    # Processing Progress
-    if job['chunks_count'] > 0:
-        chunks_processed = job.get('chunks_processed', 0)
-        status_info += f"- Chunks Processed: {chunks_processed}/{job['chunks_count']}\n"
-    
-    if job['status'] == 'completed':
-        # Calculate efficiency metrics
-        words_per_second = job['word_count'] / max(1, job['processing_time'])
-        chunks_per_second = job['chunks_count'] / max(1, job['processing_time'])
-        observations_per_chunk = job['observations_count'] / max(1, job['chunks_count'])
-        
-        status_info += f"""
-**Results:**
-- Observations: {job['observations_count']}
-- Entities: {job['entities_count']}
-- Processing Time: {job['processing_time']:.1f} seconds
-- Database: {job['kuzu_db_path']}
 
-**Efficiency Metrics:**
-- Words/Second: {words_per_second:.1f}
-- Chunks/Second: {chunks_per_second:.2f}
-- Observations/Chunk: {observations_per_chunk:.1f}
-"""
-    
-    return status_info
 
 def download_database(job_id):
     """Download the Kuzu database as a ZIP file."""
@@ -354,38 +296,9 @@ def download_database(job_id):
     
     return zip_filename, f"Database ready for download: {zip_filename}"
 
-def get_queue_status():
-    """Get overall queue status."""
-    jobs = job_queue.get_all_jobs()
-    
-    if not jobs:
-        return "No jobs in queue."
-    
-    status_counts = {}
-    for job in jobs:
-        status = job['status']
-        status_counts[status] = status_counts.get(status, 0) + 1
-    
-    status_text = "**Queue Status:**\n"
-    for status, count in status_counts.items():
-        status_text += f"- {status.capitalize()}: {count}\n"
-    
-    status_text += f"\n**Total Jobs:** {len(jobs)}"
-    return status_text
 
-def get_job_progress(job_id):
-    """Get job progress for progress bar."""
-    if not job_id:
-        return 0, "No job ID provided"
-    
-    job = job_queue.get_job(job_id)
-    if not job:
-        return 0, "Job not found"
-    
-    progress = job.get('progress', 0)
-    message = job.get('message', 'Unknown status')
-    
-    return progress, message
+
+
 
 def get_ollama_server_status():
     """Get status of all Ollama servers in the cluster."""
@@ -691,21 +604,7 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
                     refresh_llm_btn = gr.Button("🔄 Refresh LLM Status", size="sm")
                     reconnect_llm_btn = gr.Button("🔌 Force Reconnect", size="sm", variant="secondary")
     
-    with gr.Tab("Check Status"):
-        with gr.Row():
-            with gr.Column():
-                status_job_id = gr.Textbox(label="Enter Job ID")
-                check_status_btn = gr.Button("Check Status")
-                status_output = gr.Markdown(label="Job Status")
-            
-            with gr.Column():
-                queue_status_btn = gr.Button("Check Queue Status")
-                queue_output = gr.Markdown(label="Queue Status")
-        
-        with gr.Row():
-            with gr.Column():
-                ollama_status_btn = gr.Button("Check Ollama Cluster Status")
-                ollama_status_output = gr.Markdown(label="Ollama Cluster Status")
+
     
     with gr.Tab("Download Results"):
         with gr.Row():
@@ -830,24 +729,6 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
         inputs=[job_id_state],
         outputs=[auto_download_file, auto_download_output],
         show_progress=False
-    )
-    
-    check_status_btn.click(
-        check_job_status,
-        inputs=[status_job_id],
-        outputs=[status_output]
-    )
-    
-    queue_status_btn.click(
-        get_queue_status,
-        inputs=[],
-        outputs=[queue_output]
-    )
-    
-    ollama_status_btn.click(
-        get_ollama_server_status,
-        inputs=[],
-        outputs=[ollama_status_output]
     )
     
     download_btn.click(
