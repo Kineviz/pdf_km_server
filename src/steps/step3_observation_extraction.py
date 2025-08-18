@@ -30,7 +30,7 @@ def extract_observations_from_chunks(chunks: List[str], model: str, ollama_url: 
         """Process a single chunk with metadata."""
         chunk_index, chunk = chunk_data
         try:
-            logging.info(f"Processing chunk {chunk_index+1}/{len(chunks)}")
+            logging.info(f"Processing chunk {chunk_index+1}/{len(chunks)}. Model: {model}")
             chunk_observations = extract_observations_with_cluster(chunk, model, cluster)
             
             # Add chunk metadata to each observation

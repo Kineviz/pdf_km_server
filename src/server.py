@@ -130,7 +130,8 @@ def estimate_processing_time(pdf_size_mb: float, model: str = "gemma3") -> int:
     return int(estimated_time)
 
 
-def upload_and_process_pdf(pdf_file, model="gemma3", progress=gr.Progress()):
+def upload_and_process_pdf(pdf_file, model="gemma3:270m", progress=gr.Progress()):
+    print(f"Uploading and processing {pdf_file} with model: {model}")
     """Handle PDF upload and start processing."""
     if pdf_file is None:
         return "Please upload a PDF file.", None, None, gr.update(visible=False)
@@ -189,6 +190,7 @@ def upload_and_process_pdf(pdf_file, model="gemma3", progress=gr.Progress()):
                     pass
             progress(overall_progress / 100, desc=message)
         
+        print(f"Extracting observations with model: {model}")
         observations = extract_observations_from_chunks(chunks, model, progress_callback=update_chunk_progress)
         
         # Step 4: Create Kuzu database
