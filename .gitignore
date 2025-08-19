@@ -334,4 +334,5 @@ model_comparison_results.md
 temp/
 tmp/
 processing/
-/src/history.txt
+
+history.txt

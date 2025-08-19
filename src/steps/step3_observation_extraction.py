@@ -37,21 +37,6 @@ def extract_observations_from_chunks(chunks: List[str], model: str, ollama_url: 
             for obs in chunk_observations:
                 obs['chunk_index'] = chunk_index
                 
-                # Try to find the observation text within the chunk for position tracking
-                observation_text = obs['observation']
-                chunk_text = chunk
-                
-                # Find the position of the observation within the chunk
-                start_pos = chunk_text.find(observation_text)
-                if start_pos != -1:
-                    obs['chunk_start_pos'] = start_pos
-                    obs['chunk_end_pos'] = start_pos + len(observation_text)
-                else:
-                    # If exact match not found, use approximate positions
-                    obs['chunk_start_pos'] = 0
-                    obs['chunk_end_pos'] = len(chunk)
-                    obs['position_approximate'] = True
-            
             logging.info(f"Chunk {chunk_index+1}: extracted {len(chunk_observations)} observations")
             return chunk_observations
             
