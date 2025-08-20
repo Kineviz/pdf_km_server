@@ -6,13 +6,6 @@
       "model": "gemma3",
       "timeout": 30,
       "max_retries": 3
-    },
-    {
-      "name": "pc1-ip",
-      "url": "http://pc1:11434",
-      "model": "gemma3",
-      "timeout": 30,
-      "max_retries": 3
     }
   ]
 } 

@@ -1,20 +1,22 @@
 # pdf_km_server
 
-Convert PDF documents to Knowledge Maps, using Ollama and Kuzu. You can visualize the resulting Kuzu database in [GraphXR](https://www.kineviz.com/graphxr), or any graph tool which supports Kuzu.
+Convert PDF documents to Knowledge Maps, using Ollama and Kuzu.
 
-What's a Knowledge Map? It's our (Kineviz) take on knowledge graph. Relationships between entities are stored as Observation nodes, which are connected to the entities they reference. It's a holistic way to represent a document as a graph.
+What's a Knowledge Map? It's our (Kineviz) take on knowledge graph. Relationships between entities are stored as Observation nodes, which are connected to the Entities they reference. It's a holistic way to represent a document as a graph.
 
 ## Usage
 
 ### Prerequisites
 
 - [`uv`](https://docs.astral.sh/uv/)
-- [`ollama`](https://ollama.com/) with `gemma3` installed
+- [`ollama`](https://ollama.com/) with `gemma3` (or similar) installed
 
 ### Starting the Server
 
 ```bash
 cd src
+cp ollama_servers_example.json ollama_servers.json
+# edit ollama_servers.json to add your ollama server
 chmod +x server.py
 ./server.py
 ```
