@@ -13,8 +13,11 @@ import argparse
 import shutil
 import zipfile
 import tempfile
+import traceback
 import kuzu
 import pandas as pd
+    
+from merge_csv_and_load import merge_csv_files, load_data_to_kuzu
 
 def extract_single_kuzu(zip_file_path, output_dir):
     """Extract data from a single KuzuDB ZIP file to CSV format."""
@@ -134,6 +137,35 @@ def extract_single_kuzu(zip_file_path, output_dir):
         except Exception as e:
             print(f"⚠️  No MENTION relationships found: {e}")
         
+        # Extract ObservationTextVector nodes
+        observation_text_vectors = []
+        try:
+            print("🔍 Extracting ObservationTextVector nodes")
+            result = conn.execute("MATCH (otv:ObservationTextVector) RETURN otv.id, otv.vector")
+            while result.has_next():
+                row = result.get_next()
+                # Convert vector array to string representation for CSV
+                vector_str = ','.join(map(str, row[1])) if row[1] else ''
+                observation_text_vectors.append({
+                    'id': row[0],
+                    'vector': vector_str
+                })
+        except Exception as e:
+            print(f"⚠️  No ObservationTextVector nodes found: {e}")
+        
+        # Extract Observation->ObservationTextVector relationships
+        obs_text_vector_relationships = []
+        try:
+            result = conn.execute("MATCH (o:Observation)-[r:OBSERVATION_TEXT_VECTOR]->(otv:ObservationTextVector) RETURN o.id, otv.id")
+            while result.has_next():
+                row = result.get_next()
+                obs_text_vector_relationships.append({
+                    'observation_id': row[0],
+                    'text_vector_id': row[1]
+                })
+        except Exception as e:
+            print(f"⚠️  No OBSERVATION_TEXT_VECTOR relationships found: {e}")
+        
         print(f"🔌 Database connection closed for {zip_file_path}")
         
         # Create output directory
@@ -179,10 +211,19 @@ def extract_single_kuzu(zip_file_path, output_dir):
             df.to_csv(f"{output_dir}/{base_name}_entity_mentions.csv", index=False)
             print(f"✅ Exported {len(entity_mentions)} entity mentions to {base_name}_entity_mentions.csv")
 
+        if observation_text_vectors:
+            df = pd.DataFrame(observation_text_vectors)
+            df.to_csv(f"{output_dir}/{base_name}_observation_text_vectors.csv", index=False)
+            print(f"✅ Exported {len(observation_text_vectors)} ObservationTextVector nodes to {base_name}_observation_text_vectors.csv")
+
+        if obs_text_vector_relationships:
+            df = pd.DataFrame(obs_text_vector_relationships)
+            df.to_csv(f"{output_dir}/{base_name}_obs_text_vector_relationships.csv", index=False)
+            print(f"✅ Exported {len(obs_text_vector_relationships)} Observation->ObservationTextVector relationships to {base_name}_obs_text_vector_relationships.csv")
+
         print("✅ Finished extracting csv")
     except Exception as e:
         print(f"❌ Error extracting {zip_file_path}: {e}")
-        import traceback
         traceback.print_exc()
     finally:
         try:
@@ -224,11 +265,7 @@ def merge_and_load(output_db, temp_dir):
     print(f"🔄 Merging CSV files and loading into: {output_db}")
     
     # Import the existing merge function
-    import sys
     sys.path.append('.')
-    
-    # Import the merge function from the existing script
-    from merge_csv_and_load import merge_csv_files, load_data_to_kuzu
     
     # Merge CSV files
     merged_data = merge_csv_files(temp_dir)
@@ -291,7 +328,6 @@ def main():
         
     except Exception as e:
         print(f"❌ Error during merge: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
 

@@ -8,8 +8,6 @@ This folder contains tools for merging multiple KuzuDB ZIP files into a single c
 
 - **`merge_kuzu_cli.py`** - Main command-line interface for merging multiple KuzuDB files
 - **`merge_csv_and_load.py`** - Core merge functionality (CSV merging and KuzuDB loading)
-- **`extract_kuzu_to_csv.py`** - Extract data from KuzuDB ZIP files to CSV format
-- **`extract_both_files.py`** - Alternative extraction script using subprocess isolation
 - **`verify_merged_db.py`** - Verify the contents of a merged KuzuDB
 
 ## Usage

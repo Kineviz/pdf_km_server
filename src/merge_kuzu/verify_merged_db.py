@@ -41,6 +41,12 @@ def verify_merged_database(kuzu_path: str):
             count = result.get_next()[0]
             print(f"✅ Found {count} PDFs")
         
+        # Count ObservationTextVectors
+        result = conn.execute("MATCH (otv:ObservationTextVector) RETURN count(otv)")
+        if result.has_next():
+            count = result.get_next()[0]
+            print(f"✅ Found {count} ObservationTextVectors")
+        
         # Count relationships
         result = conn.execute("MATCH ()-[r:HAS_CHUNK]->() RETURN count(r)")
         if result.has_next():
@@ -57,6 +63,11 @@ def verify_merged_database(kuzu_path: str):
             count = result.get_next()[0]
             print(f"✅ Found {count} MENTION relationships")
         
+        result = conn.execute("MATCH ()-[r:OBSERVATION_TEXT_VECTOR]->() RETURN count(r)")
+        if result.has_next():
+            count = result.get_next()[0]
+            print(f"✅ Found {count} OBSERVATION_TEXT_VECTOR relationships")
+        
         # Show sample entities
         print(f"\n📋 Sample entities:")
         result = conn.execute("MATCH (e:Entity) RETURN e.id, e.label, e.category LIMIT 5")
@@ -70,6 +81,13 @@ def verify_merged_database(kuzu_path: str):
         while result.has_next():
             row = result.get_next()
             print(f"  • {row[1]} ({row[0]})")
+        
+        # Show sample ObservationTextVectors
+        print(f"\n🔢 Sample ObservationTextVectors:")
+        result = conn.execute("MATCH (otv:ObservationTextVector) RETURN otv.id, length(otv.vector) LIMIT 5")
+        while result.has_next():
+            row = result.get_next()
+            print(f"  • {row[0]} (vector length: {row[1]})")
         
         conn.close()
         db.close()

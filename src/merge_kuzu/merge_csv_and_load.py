@@ -27,10 +27,14 @@ def merge_csv_files(csv_dir: str) -> Dict[str, pd.DataFrame]:
         # Extract type from filename, handling relationship types properly
         if 'obs_chunk_relationships' in file:
             file_type = 'obs_chunk_relationships'
+        elif 'obs_text_vector_relationships' in file:
+            file_type = 'obs_text_vector_relationships'
         elif 'chunk_relationships' in file:
             file_type = 'chunk_relationships'
         elif 'entity_mentions' in file:
             file_type = 'entity_mentions'
+        elif 'observation_text_vectors' in file:
+            file_type = 'observation_text_vectors'
         else:
             # Extract type from filename (e.g., km_kuzu_bell_lab_entities.csv -> entities)
             parts = file.replace('.csv', '').split('_')
@@ -62,6 +66,8 @@ def merge_csv_files(csv_dir: str) -> Dict[str, pd.DataFrame]:
                 merged_df = merged_df.drop_duplicates(subset=['id'])
             elif file_type == 'pdfs':
                 merged_df = merged_df.drop_duplicates(subset=['path'])
+            elif file_type == 'observation_text_vectors':
+                merged_df = merged_df.drop_duplicates(subset=['id'])
             else:
                 # For relationship files, remove exact duplicates
                 merged_df = merged_df.drop_duplicates()
@@ -129,6 +135,21 @@ def create_kuzu_schema(conn):
         pass
     
     try:
+        # Create ObservationTextVector node table
+        print(f"🪵 Creating ObservationTextVector table")
+        result = conn.execute("""
+            CREATE NODE TABLE IF NOT EXISTS ObservationTextVector(
+                id STRING PRIMARY KEY,
+                vector FLOAT[384]
+            )
+        """)
+        print(f"🪵 Result: {result.get_next()}")
+    except Exception as e:
+        # Table might already exist, continue
+        print(f"⚠️  Failed to create ObservationTextVector table: {e}")
+        pass
+    
+    try:
         # Create HAS_CHUNK relationship table
         conn.execute("""
             CREATE REL TABLE IF NOT EXISTS HAS_CHUNK(
@@ -155,6 +176,17 @@ def create_kuzu_schema(conn):
         conn.execute("""
             CREATE REL TABLE IF NOT EXISTS MENTION(
                 FROM Observation TO Entity
+            )
+        """)
+    except Exception as e:
+        # Table might already exist, continue
+        pass
+    
+    try:
+        # Create OBSERVATION_TEXT_VECTOR relationship table
+        conn.execute("""
+            CREATE REL TABLE IF NOT EXISTS OBSERVATION_TEXT_VECTOR(
+                FROM Observation TO ObservationTextVector
             )
         """)
     except Exception as e:
@@ -227,6 +259,27 @@ def load_data_to_kuzu(merged_data: Dict[str, pd.DataFrame], kuzu_path: str):
                 }
             )
     
+    # Load ObservationTextVectors
+    if 'observation_text_vectors' in merged_data:
+        print(f"🔢 Loading {len(merged_data['observation_text_vectors'])} observation text vectors...")
+        for _, row in merged_data['observation_text_vectors'].iterrows():
+            # Convert comma-separated string back to float array
+            vector_str = row['vector']
+            if vector_str:
+                try:
+                    vector = [float(x.strip()) for x in vector_str.split(',')]
+                    conn.execute(
+                        "MERGE (otv:ObservationTextVector {id: $id, vector: $vector})",
+                        {
+                            "id": row['id'],
+                            "vector": vector
+                        }
+                    )
+                except (ValueError, AttributeError) as e:
+                    print(f"⚠️  Failed to parse vector for {row['id']}: {e}")
+            else:
+                print(f"⚠️  Empty vector for {row['id']}")
+    
     # Load relationships
     print(f"🔍 Available relationship types: {list(merged_data.keys())}")
     
@@ -295,6 +348,45 @@ def load_data_to_kuzu(merged_data: Dict[str, pd.DataFrame], kuzu_path: str):
             except Exception as e:
                 print(f"⚠️  Failed to load obs-chunk relationship {row['observation_id']} -> {row['chunk_id']}: {e}")
         print(f"✅ Loaded {loaded_count} observation-chunk relationships")
+    
+    # Load observation-text vector relationships (Observation to ObservationTextVector)
+    if 'obs_text_vector_relationships' in merged_data:
+        print(f"🔗 Loading {len(merged_data['obs_text_vector_relationships'])} observation-text vector relationships...")
+        loaded_count = 0
+        for _, row in merged_data['obs_text_vector_relationships'].iterrows():
+            try:
+                conn.execute(
+                    """
+                    MATCH (o:Observation {id: $observation_id})
+                    MATCH (otv:ObservationTextVector {id: $text_vector_id})
+                    MERGE (o)-[r:OBSERVATION_TEXT_VECTOR]->(otv)
+                    """,
+                    {
+                        "observation_id": row['observation_id'],
+                        "text_vector_id": row['text_vector_id']
+                    }
+                )
+                loaded_count += 1
+            except Exception as e:
+                print(f"⚠️  Failed to load obs-text-vector relationship {row['observation_id']} -> {row['text_vector_id']}: {e}")
+        print(f"✅ Loaded {loaded_count} observation-text vector relationships")
+    
+    # Create vector index for ObservationTextVector
+    print("🔍 Creating vector index...")
+    try:
+        conn.execute("INSTALL vector; LOAD vector;")
+        conn.execute("""
+            CALL CREATE_VECTOR_INDEX(
+                'ObservationTextVector',
+                'observation_text_vector_index',
+                'vector',
+                metric := 'cosine'
+            )
+        """)
+        print("✅ Vector index created successfully")
+    except Exception as e:
+        print(f"⚠️  Failed to create vector index: {e}")
+        print("Note: Vector index creation might fail if no ObservationTextVector data exists")
     
     conn.close()
     db.close()
