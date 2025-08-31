@@ -4,7 +4,7 @@
 # dependencies = [
 #     "chonky>=0.1.6",
 #     "click>=8.1.0",
-#     "kuzu==0.10.0",
+#     "kuzu==0.11.2",
 #     "markitdown[pdf]>=0.1.2",
 #     "requests>=2.32.4",
 #     "torch>=2.7.1",
@@ -198,7 +198,7 @@ def upload_and_process_pdf(pdf_file, model="gemma3:270m", progress=gr.Progress()
         progress(0.95, desc="Creating knowledge graph database...")
         
         # Create unique database path for this job
-        kuzu_db_path = f"result_kuzudb/kuzu_db_{job_id}"
+        kuzu_db_path = f"result_kuzudb/kuzu_db_{job_id}.kz"
         if os.path.exists(kuzu_db_path):
             shutil.rmtree(kuzu_db_path)
         
@@ -231,9 +231,6 @@ def upload_and_process_pdf(pdf_file, model="gemma3:270m", progress=gr.Progress()
         # Debug logging
         logger.info(f"Job {job_id} completed. Database path: {kuzu_db_path}")
         logger.info(f"Database exists: {os.path.exists(kuzu_db_path)}")
-        if os.path.exists(kuzu_db_path):
-            logger.info(f"Database contents: {os.listdir(kuzu_db_path)}")
-        
     except Exception as e:
         logger.error(f"Error processing job {job_id}: {e}")
         job_queue.update_job(
@@ -321,50 +318,7 @@ def auto_download_when_ready(job_id):
         kuzu_db_path = job['kuzu_db_path']
         logger.info(f"Checking database path: {kuzu_db_path}")
         logger.info(f"Database exists: {os.path.exists(kuzu_db_path)}")
-        
-        if not os.path.exists(kuzu_db_path):
-            # Check if there are any kuzu_db directories
-            import glob
-            kuzu_dirs = glob.glob("result_kuzudb/kuzu_db_*")
-            logger.info(f"Found kuzu directories: {kuzu_dirs}")
-            return None, f"Database file not found at: {kuzu_db_path}. Found directories: {kuzu_dirs}"
-        
-        # List database contents
-        try:
-            db_contents = os.listdir(kuzu_db_path)
-            logger.info(f"Database contents: {db_contents}")
-        except Exception as e:
-            logger.error(f"Error listing database contents: {e}")
-            return None, f"Error accessing database: {str(e)}"
-        
-        zip_filename = f"result_kuzudb/km_kuzu_{job_id}.zip"
-        try:
-            with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, dirs, files in os.walk(kuzu_db_path):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, kuzu_db_path)
-                        zipf.write(file_path, arcname)
-            
-            # Ensure the ZIP file is readable
-            os.chmod(zip_filename, 0o644)
-            
-            logger.info(f"Created ZIP file: {zip_filename}")
-            
-            # Verify the ZIP file was created and is readable
-            if os.path.exists(zip_filename):
-                file_size = os.path.getsize(zip_filename)
-                logger.info(f"ZIP file size: {file_size} bytes")
-                logger.info(f"Returning file path: {zip_filename}")
-                logger.info(f"File is readable: {os.access(zip_filename, os.R_OK)}")
-                # Return the file path for Gradio to serve (same format as download_database)
-                return zip_filename, f"✅ Database ready for download! ({file_size} bytes)"
-            else:
-                logger.error(f"ZIP file was not created: {zip_filename}")
-                return None, f"❌ Error: ZIP file was not created"
-        except Exception as e:
-            logger.error(f"Error creating ZIP file: {e}")
-            return None, f"❌ Error creating ZIP file: {str(e)}"
+        return kuzu_db_path, f"✅ Database ready for download! ({os.path.getsize(kuzu_db_path)} bytes)"
     elif job['status'] == 'failed':
         return None, f"❌ Processing failed: {job.get('message', 'Unknown error')}"
     else:
