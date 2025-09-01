@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "kuzu==0.10.0",
+#     "kuzu==0.11.2",
 #     "pandas>=2.0.0",
 # ]
 # ///
@@ -11,31 +11,16 @@ import os
 import sys
 import argparse
 import shutil
-import zipfile
-import tempfile
 import traceback
 import kuzu
 import pandas as pd
     
 from merge_csv_and_load import merge_csv_files, load_data_to_kuzu
 
-def extract_single_kuzu(zip_file_path, output_dir):
-    """Extract data from a single KuzuDB ZIP file to CSV format."""
-    print(f"🔍 Extracting data from: {zip_file_path}")
-    
-    # Create temporary directory
-    temp_dir = tempfile.mkdtemp()
-    print(f"📁 Created temp dir: {temp_dir}")
-    
-    # Extract ZIP file
-    print(f"📦 Extracting ZIP file...")
-    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-        zip_ref.extractall(temp_dir)
-    print(f"✅ ZIP extraction completed")
-
-    # Connect to database
+def extract_single_kuzu(kuzu_path, output_dir):
+    """Extract data from a single Kuzu file to CSV format."""
     print(f"🔌 Connecting to database...")
-    db = kuzu.Database(temp_dir)
+    db = kuzu.Database(kuzu_path)
     conn = kuzu.Connection(db)
     print(f"✅ Database connection successful")
     try:
@@ -166,13 +151,13 @@ def extract_single_kuzu(zip_file_path, output_dir):
         except Exception as e:
             print(f"⚠️  No OBSERVATION_TEXT_VECTOR relationships found: {e}")
         
-        print(f"🔌 Database connection closed for {zip_file_path}")
+        print(f"🔌 Database connection closed for {kuzu_path}")
         
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
         
         # Write CSV files
-        base_name = os.path.splitext(os.path.basename(zip_file_path))[0]
+        base_name = os.path.splitext(os.path.basename(kuzu_path))[0]
         
         # Write nodes
         if entities:
@@ -223,40 +208,31 @@ def extract_single_kuzu(zip_file_path, output_dir):
 
         print("✅ Finished extracting csv")
     except Exception as e:
-        print(f"❌ Error extracting {zip_file_path}: {e}")
+        print(f"❌ Error extracting {kuzu_path}: {e}")
         traceback.print_exc()
     finally:
-        try:
-            shutil.rmtree(temp_dir)
-            print(f"🧹 Cleaned up temp dir: {temp_dir}")
-        except Exception as e:
-            print(f"⚠️  Warning: Could not clean up temp dir {temp_dir}: {e}")
-        
-        print(f"✅ Completed processing {zip_file_path}")
+        print(f"✅ Completed processing {kuzu_path}")
 
 
 def extract_kuzu_files(input_files, temp_dir):
     """Extract multiple KuzuDB files using the extract_single_kuzu function."""
     print(f"🔄 Extracting {len(input_files)} KuzuDB files...")
     
-    # Create temp directory
-    os.makedirs(temp_dir, exist_ok=True)
-    
     # Extract each file using the extract_single_kuzu function
     print(f"🔍 Processing: {input_files}")
-    for zip_file in input_files:
-        print("Checking if file exists: ", zip_file)
-        if not os.path.exists(zip_file):
-            print(f"❌ File not found: {zip_file}")
+    for kuzu_file in input_files:
+        print("Checking if file exists: ", kuzu_file)
+        if not os.path.exists(kuzu_file):
+            print(f"❌ File not found: {kuzu_file}")
             sys.exit(1)
-        print(f"🔍 Processing: {zip_file}")
+        print(f"🔍 Processing: {kuzu_file}")
         
         # Call the extraction function directly
         try:
-            extract_single_kuzu(zip_file, temp_dir)
-            print(f"✅ Extraction completed for {zip_file}")
+            extract_single_kuzu(kuzu_file, temp_dir)
+            print(f"✅ Extraction completed for {kuzu_file}")
         except Exception as e:
-            print(f"❌ Error during extraction for {zip_file}: {e}")
+            print(f"❌ Error during extraction for {kuzu_file}: {e}")
     
     print("✅ Extraction completed for all files")
 
@@ -277,12 +253,11 @@ def merge_and_load(output_db, temp_dir):
 
 def main():
     """Merge multiple KuzuDB ZIP files into a single database."""
-    parser = argparse.ArgumentParser(description='Merge multiple KuzuDB ZIP files into a single database')
-    parser.add_argument('input_files', nargs='+', help='KuzuDB ZIP files to merge')
-    parser.add_argument('-o', '--output', default='merged_kuzu_db', help='Output database path (default: merged_kuzu_db)')
+    parser = argparse.ArgumentParser(description='Merge multiple Kuzu files into a single database')
+    parser.add_argument('input_files', nargs='+', help='Kuzu files to merge')
+    parser.add_argument('-o', '--output', default='merged_kuzu_db.kz', help='Output database path (default: merged_kuzu_db.kz)')
     parser.add_argument('--temp-dir', default='extracted_csv_data', help='Temporary directory for CSV files (default: extracted_csv_data)')
     parser.add_argument('--keep-csv', action='store_true', help='Keep CSV files after merge (default: delete them)')
-    parser.add_argument('--result-dir', default='result_kuzudb', help='Result directory for zipped database (default: result_kuzudb)')
     
     args = parser.parse_args()
     
@@ -290,10 +265,10 @@ def main():
     print(f"📁 Input files: {args.input_files}")
     
     try:
-        # Extract each ZIP file
+        # Extract each Kuzu file
         extract_kuzu_files(args.input_files, args.temp_dir)
         
-        # Merge CSV files and load into KuzuDB
+        # Merge CSV files and load into KuzuDB at path args.output
         merge_and_load(args.output, args.temp_dir)
         
         # Clean up CSV files unless --keep-csv is specified
@@ -302,27 +277,6 @@ def main():
                 shutil.rmtree(args.temp_dir)
                 print(f"🧹 Cleaned up temporary CSV directory: {args.temp_dir}")
         
-        # Create result directory and zip the database
-        os.makedirs(args.result_dir, exist_ok=True)
-        zip_filename = f"{args.output}.zip"
-        zip_path = os.path.join(args.result_dir, zip_filename)
-        
-        print(f"📦 Creating ZIP file: {zip_path}")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(args.output):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    arcname = os.path.relpath(file_path, args.output)
-                    zipf.write(file_path, arcname)
-        
-        print(f"✅ Created ZIP file: {zip_path}")
-        
-        # Remove the merged database directory
-        if os.path.exists(args.output):
-            shutil.rmtree(args.output)
-            print(f"🧹 Removed merged database directory: {args.output}")
-        
-        print(f"\n🎉 Merge completed! Zipped database: {zip_path}")
         if args.keep_csv:
             print(f"📁 CSV files saved to: {args.temp_dir}")
         

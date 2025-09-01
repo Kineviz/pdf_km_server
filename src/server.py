@@ -332,7 +332,8 @@ def merge_kuzu_databases(kuzu_files, progress=gr.Progress()):
     try:
         # Create temporary directory for the merge
         temp_dir = tempfile.mkdtemp()
-        merge_output_dir = os.path.join(temp_dir, "merged_kuzu_db")
+        output_kuzu_path = os.path.join(temp_dir, "merged_kuzu_db.kz")
+        csv_data_path = os.path.join(temp_dir, "csv_data")
         
         # Save uploaded files to temp directory
         saved_files = []
@@ -361,8 +362,9 @@ def merge_kuzu_databases(kuzu_files, progress=gr.Progress()):
             return None, "❌ Merge script not found. Please ensure merge_kuzu folder exists."
         
         # Construct the command
-        cmd = ["uv", "run", "--script", merge_script, "-o", merge_output_dir, "--result-dir", temp_dir, "--temp-dir", os.path.join(temp_dir, "csv_data")]
+        cmd = ["uv", "run", "--script", merge_script, "-o", output_kuzu_path, "--temp-dir", csv_data_path]
         cmd.extend(saved_files)
+        print(f"🔄 Running merge command: {cmd}")
         
         progress(0.2, desc="🔄 Starting merge process...")
         
@@ -375,27 +377,15 @@ def merge_kuzu_databases(kuzu_files, progress=gr.Progress()):
             error_msg = result.stderr if result.stderr else "Unknown error"
             return None, f"❌ Merge failed: {error_msg}"
         
-        # Find the created ZIP file
-        zip_files = [f for f in os.listdir(temp_dir) if f.endswith('.zip')]
-        if not zip_files:
-            return None, "❌ No merged database ZIP file found"
-        
-        zip_path = os.path.join(temp_dir, zip_files[0])
-        
         # Create a unique filename for download in a persistent location
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        download_filename = f"merged_kuzu_db_{timestamp}.zip"
+        download_filename = f"merged_kuzu_db_{timestamp}.kz"
         
         # Ensure result_kuzudb directory exists
         result_dir = "result_kuzudb"
         os.makedirs(result_dir, exist_ok=True)
-        
         download_path = os.path.join(result_dir, download_filename)
-        
-        # Copy to persistent download path
-        shutil.copy2(zip_path, download_path)
-        
-        # Ensure the file is readable
+        shutil.copy2(output_kuzu_path, download_path)
         os.chmod(download_path, 0o644)
         
         progress(1.0, desc="✅ Merge completed!")
@@ -535,7 +525,7 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
             with gr.Column(scale=2):
                 kuzu_files_input = gr.File(
                     label="Upload KuzuDB Files", 
-                    file_types=[".zip"],
+                    file_types=[".kz"],
                     file_count="multiple"
                 )
                 merge_btn = gr.Button("🔄 Merge Databases", variant="primary")
@@ -545,18 +535,16 @@ with gr.Blocks(title="PDF to Knowledge Map Server", theme=gr.themes.Soft()) as d
             with gr.Column(scale=1):
                 gr.Markdown("### Merge Process")
                 gr.Markdown("""
-                1. **Upload multiple KuzuDB ZIP files**
+                1. **Upload multiple Kuzu files**
                 2. **Extract data** from each database
                 3. **Merge and deduplicate** entities and relationships
                 4. **Create consolidated** KuzuDB
                 5. **Download merged** database
-                
-                **Time:** 10-30 seconds
                 """)
                 
                 gr.Markdown("### 📋 Supported Files")
                 gr.Markdown("""
-                - KuzuDB ZIP files (`.zip`) created by this server
+                - KuzuDB files (`.kz`) created by this server
                 - Multiple files can be uploaded
                 - Each file must be from a different PDF
                 - Automatic deduplication
